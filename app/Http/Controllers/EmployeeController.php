@@ -20,7 +20,6 @@ class EmployeeController extends Controller
         select *, employees.id as employee_id, positions.name as position_name from employees
         left join positions on employees.position_id = positions.id
 ');
-
         return view('employee.index', ['pageTitle' => $pageTitle, 'employees' => $employees]);
 
     }
@@ -35,9 +34,6 @@ class EmployeeController extends Controller
         $positions = DB::select('select * from positions');
 
         return view('employee.create', compact('pageTitle', 'positions'));
-
-
-
     }
 
     /**
@@ -72,8 +68,6 @@ class EmployeeController extends Controller
         ]);
 
         return redirect()->route('employees.index');
-
-
     }
 
     /**
@@ -91,6 +85,12 @@ class EmployeeController extends Controller
             where employees.id = ?
         ', [$id]))->first();
 
+        //Query Builder
+        $employee = DB::table('employees')
+        ->leftJoin('positions', 'employees.position_id', '=', 'positions.id')
+        ->select('employees.*', 'employees.id as employee_id', 'positions.name as position_name')
+        ->where('employees.id', $id)
+        ->first();
         return view('employee.show', compact('pageTitle', 'employee'));
 
     }
@@ -100,7 +100,20 @@ class EmployeeController extends Controller
      */
     public function edit(string $id)
     {
-        //
+        // //RAW SQL QUERY
+        // $employee = collect(DB::select('select * employees.id as employee.id, positions.name as position_name from employees
+        // left join positions on employees.position_id = positions.id where employees.id = ?', [$id]))->first(); $positions = DB::select('select* from positions');
+
+        // return view('employee.edit', compact('pageTitle', 'employee', 'posiions'));
+        // Query Builder
+        $employee = DB::table('employees')
+        ->leftJoin('positions', 'employees.position_id', '=', 'positions.id')
+        ->select('employees.*', 'employees.id as employee_id', 'positions.name as positions_name')
+        ->where('employees.id', $id)
+        ->first();
+
+        $positions = DB::table('positions')->get();
+        return view('employee.edit', compact('pageTitle', 'employee', 'positions'));
     }
 
     /**
@@ -108,7 +121,16 @@ class EmployeeController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        // INSERT QUERY
+        DB::table('employees')->where('id', $id)->update([
+            'firstname' => $request->firstName,
+            'lastname'  => $request->lastName,
+            'email'  => $request->email,
+            'age'  => $request->age,
+            'position_id' => $request->position,
+        ]);
+
+        return redirect()->route('employees.index');
     }
 
     /**

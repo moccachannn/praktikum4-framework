@@ -31,6 +31,11 @@
         </div>
     </nav>
 
+@extends('layouts.app')
+
+@section('content')
+    @include('default')
+
     <div class="container mt-4">
         <h4>{{ $pageTitle }}</h4>
         <hr>
@@ -39,7 +44,7 @@
             <h4 class="mb-0">Well done! this is {{ $pageTitle }}.</h4>
         </div>
     </div>
-
+@endsection
     @vite('resources/js/app.js')
 </body>
 </html>

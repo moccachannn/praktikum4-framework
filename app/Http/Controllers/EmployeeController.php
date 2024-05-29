@@ -2,14 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use PDF;
 use App\Models\Employee;
 use App\Models\Position;
+use Maatwebsite\Excel\Facades\Excel;
+use App\ExportEmployeesExport;
+use Barryvdh\DomPDF\Facade\Pdf as FacadePdf;
+use Barryvdh\DomPDF\PDF as DomPDFPDF;
 use Illuminate\Contracts\Cache\Store;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use RealRashid\SweetAlert\Facades\Alert;
 
 class EmployeeController extends Controller
 {
@@ -19,13 +25,12 @@ class EmployeeController extends Controller
     public function index()
     {
         $pageTitle = 'Employee List';
-
-        // ELOQUENT
-        $employees = Employee::all();
-
+        confirmDelete();
+        $positions = Position::all();
         return view('employee.index', [
             'pageTitle' => $pageTitle,
-            'employees' => $employees]);
+            'positions' => $positions
+        ]);
     }
 
     /**
@@ -75,7 +80,7 @@ class EmployeeController extends Controller
         }
 
         // ELOQUENT
-        $employee = New Employee;
+        $employee = new Employee;
         $employee->firstname = $request->firstName;
         $employee->lastname = $request->lastName;
         $employee->email = $request->email;
@@ -86,11 +91,11 @@ class EmployeeController extends Controller
             $employee->original_filename = $originalFilename;
             $employee->encrypted_filename = $encryptedFilename;
         }
+        Alert::success('Added Successfully', 'Employee Data Added Successfully.');
 
         $employee->save();
 
         return redirect()->route('employees.index');
-
     }
 
     /**
@@ -121,11 +126,11 @@ class EmployeeController extends Controller
         $employee = Employee::find($id);
 
         //Check if employee exists
-        if(!$employee){
+        if (!$employee) {
             //Handle the case where the employee is not found
             return redirect()->route('employees.index')->with('error', 'Employee not found.');
         }
-        return view('employee.edit', compact('pageTitle', 'positions', 'employee' ));
+        return view('employee.edit', compact('pageTitle', 'positions', 'employee'));
     }
 
     /**
@@ -157,20 +162,21 @@ class EmployeeController extends Controller
         $employee->position_id = $request->position;
 
         //handle cv
-        if ($request->hasFile('cv')){
+        if ($request->hasFile('cv')) {
             $file = $request->file('cv');
             $originalFilename = $file->getClientOriginalName();
             $encryptedFilename = $file->hashName();
             $file->store('public/files');
 
-        // menghapus cv lama jika tersedia
-        if($employee->encrypted_filename){
-            Storage::delete('public/files/' . $employee->encrypted_filename);
-        }
+            // menghapus cv lama jika tersedia
+            if ($employee->encrypted_filename) {
+                Storage::delete('public/files/' . $employee->encrypted_filename);
+            }
 
-        $employee->original_filename = $originalFilename;
-        $employee->encrypted_filename = $encryptedFilename;
+            $employee->original_filename = $originalFilename;
+            $employee->encrypted_filename = $encryptedFilename;
         }
+        Alert::success('Changed Successfully', 'Employee Data Changed Successfully.');
 
         $employee->save();
 
@@ -186,22 +192,50 @@ class EmployeeController extends Controller
         $employee = Employee::find($id);
 
         //menghapus cv
-        if($employee->encrypted_filename){
+        if ($employee->encrypted_filename) {
             Storage::delete('public/files/' . $employee->encrypted_filename);
         }
+        Alert::success('Deleted Successfully', 'Employee Data Deleted Successfully.');
         $employee->delete();
         return redirect()->route('employees.index');
-
     }
     public function downloadFile($employeeId)
-{
-    $employee = Employee::find($employeeId);
-    $encryptedFilename = 'public/files/'.$employee->encrypted_filename;
-    $downloadFilename = Str::lower($$employee->firstname.'_'.$employee->lastname.'_cv.pdf');
+    {
+        $employee = Employee::find($employeeId);
+        $encryptedFilename = 'public/files/' . $employee->encrypted_filename;
+        $downloadFilename = Str::lower($employee->firstname . '_' . $employee->lastname . '_cv.pdf');
 
-    if(Storage::exists($encryptedFilename)) {
-        return Storage::download($encryptedFilename, $downloadFilename);
+        if (Storage::exists($encryptedFilename)) {
+            return Storage::download($encryptedFilename, $downloadFilename);
+        }
     }
-}
 
+    public function getData(Request $request)
+    {
+        $employees = Employee::with('position');
+
+        if ($request->ajax()) {
+            return datatables()->of($employees)
+                ->addIndexColumn()
+                ->addColumn('actions', function ($employee) {
+                    return view('employee.actions', compact('employee'));
+                })
+                ->toJson();
+        }
+    }
+
+    public function exportExcel()
+    {
+        return Excel::download(new EmployeesExport, 'employees.xlsx');
+
+    }
+
+    public function exportPdf()
+    {
+        $employees = Employee::all();
+
+        $pdf = FacadePdf::loadView('employee.export_pdf', compact('employees'));
+
+        return $pdf->download('employees.pdf');
+    }
 }
